@@ -393,20 +393,16 @@ export function convertEventToStreamParts(
 
       if (!state.questionRequests.has(questionId)) {
         state.questionRequests.add(questionId);
-
-        const warning =
-          "OpenCode question.asked events are not yet mapped to AI SDK responses. " +
-          "The provider cannot answer interactive questions automatically.";
-        if (logger) {
-          logger.warn(warning);
-        }
-
         parts.push({
-          type: "error",
-          error: new Error(
-            `${warning} Question ID: ${questionId}. ` +
-              "If this blocks generation, answer/reject the question in OpenCode directly.",
-          ),
+          type: "tool-approval-request",
+          approvalId: questionId,
+          toolCallId: questionEvent.properties.tool?.callID ?? questionId,
+          providerMetadata: {
+            opencode: {
+              sessionId: questionEvent.properties.sessionID,
+              questions: questionEvent.properties.questions,
+            },
+          },
         });
       }
       break;

@@ -1047,13 +1047,8 @@ describe("convert-from-opencode-events", () => {
     });
 
     describe("question events", () => {
-      it("should emit an error for question.asked (once per question id)", () => {
+      it("should emit tool-approval-request for question.asked (once per question id)", () => {
         const state = createStreamState();
-        const logger: Logger = {
-          warn: vi.fn(),
-          error: vi.fn(),
-          debug: vi.fn(),
-        };
 
         const event: EventQuestionAsked = {
           type: "question.asked",
@@ -1070,16 +1065,66 @@ describe("convert-from-opencode-events", () => {
                 ],
               },
             ],
+            tool: {
+              messageID: "msg-1",
+              callID: "call-1",
+            },
           },
         };
 
-        const parts1 = convertEventToStreamParts(event, state, logger);
-        expect(parts1).toHaveLength(1);
-        expect(parts1[0]).toMatchObject({ type: "error" });
-        expect(logger.warn).toHaveBeenCalled();
+        const parts1 = convertEventToStreamParts(event, state);
+        expect(parts1).toEqual([
+          {
+            type: "tool-approval-request",
+            approvalId: "question-1",
+            toolCallId: "call-1",
+            providerMetadata: {
+              opencode: {
+                sessionId: "session-123",
+                questions: [
+                  {
+                    header: "Deploy",
+                    question: "Pick deployment strategy",
+                    options: [
+                      { label: "Blue/Green", description: "Safer rollout" },
+                      { label: "In-place", description: "Faster" },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        ]);
 
-        const parts2 = convertEventToStreamParts(event, state, logger);
+        const parts2 = convertEventToStreamParts(event, state);
         expect(parts2).toHaveLength(0);
+      });
+
+      it("should fall back to question id as toolCallId when no tool is provided", () => {
+        const state = createStreamState();
+
+        const event: EventQuestionAsked = {
+          type: "question.asked",
+          properties: {
+            id: "question-2",
+            sessionID: "session-123",
+            questions: [
+              {
+                header: "Confirm",
+                question: "Proceed?",
+                options: [{ label: "Yes", description: "Continue" }],
+              },
+            ],
+          },
+        };
+
+        const parts = convertEventToStreamParts(event, state);
+        expect(parts).toHaveLength(1);
+        expect(parts[0]).toMatchObject({
+          type: "tool-approval-request",
+          approvalId: "question-2",
+          toolCallId: "question-2",
+        });
       });
     });
 
